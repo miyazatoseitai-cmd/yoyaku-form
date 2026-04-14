@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(rm \"/Users/miyazatomasayuki/予約フォーム/src/conversation.ts\")",
+      "Bash(mkdir -p \"/Users/miyazatomasayuki/予約フォーム/public\")",
+      "mcp__Claude_Preview__preview_start",
+      "Read(//opt/homebrew/lib/node_modules/npm/bin/**)",
+      "Read(//opt/homebrew/Cellar/node/25.9.0_1/bin/**)",
+      "Bash(/opt/homebrew/bin/node --version)"
+    ]
+  }
+}

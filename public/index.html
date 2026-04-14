@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ご予約フォーム</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- LIFF SDK -->
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>ご予約フォーム</h1>
+
+    <!-- Step 1: 入力フォーム -->
+    <div id="step-form">
+      <p class="subtitle">以下をご入力のうえ、確認ボタンを押してください。</p>
+
+      <div class="form-group">
+        <label for="menu">メニュー <span class="required">必須</span></label>
+        <select id="menu">
+          <option value="">選択してください</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="date">ご希望日 <span class="required">必須</span></label>
+        <input type="date" id="date" />
+      </div>
+
+      <div class="form-group">
+        <label for="time">ご希望時間 <span class="required">必須</span></label>
+        <select id="time">
+          <option value="">選択してください</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="name">お名前 <span class="required">必須</span></label>
+        <input type="text" id="name" placeholder="例：山田 花子" />
+      </div>
+
+      <div class="form-group">
+        <label for="phone">電話番号 <span class="required">必須</span></label>
+        <input type="tel" id="phone" placeholder="例：090-1234-5678" />
+      </div>
+
+      <p id="error-msg" class="error hidden"></p>
+      <button class="btn" onclick="goConfirm()">内容を確認する</button>
+    </div>
+
+    <!-- Step 2: 確認画面 -->
+    <div id="step-confirm" class="hidden">
+      <p class="subtitle">以下の内容でよろしいですか？</p>
+      <table class="confirm-table">
+        <tr><th>メニュー</th><td id="c-menu"></td></tr>
+        <tr><th>ご希望日</th><td id="c-date"></td></tr>
+        <tr><th>ご希望時間</th><td id="c-time"></td></tr>
+        <tr><th>お名前</th><td id="c-name"></td></tr>
+        <tr><th>電話番号</th><td id="c-phone"></td></tr>
+      </table>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="goBack()">修正する</button>
+        <button class="btn" id="submit-btn" onclick="submitReservation()">予約を確定する</button>
+      </div>
+    </div>
+
+    <!-- Step 3: 送信中 -->
+    <div id="step-loading" class="hidden">
+      <div class="loading-box">
+        <div class="spinner"></div>
+        <p>予約を登録しています…</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // LINEユーザーIDを保持する変数
+    let lineUserId = null;
+
+    // LIFF初期化 → ユーザーIDを取得
+    const LIFF_ID = '__LIFF_ID__';
+
+    async function initLiff() {
+      try {
+        await liff.init({ liffId: LIFF_ID });
+        if (liff.isLoggedIn()) {
+          const profile = await liff.getProfile();
+          lineUserId = profile.userId;
+        } else {
+          // LINE外（PCブラウザなど）からのアクセス時はログインを促す
+          liff.login();
+        }
+      } catch (e) {
+        // LIFF初期化失敗時はLINE通知なしで続行（通知なし予約として処理）
+        console.warn('LIFF初期化エラー（LINE外からのアクセス）:', e);
+      }
+    }
+
+    // ページ読み込み時にLIFF初期化
+    initLiff();
+
+    // 日付の最小値を今日の翌日に設定
+    const dateInput = document.getElementById('date');
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    dateInput.min = tomorrow.toISOString().split('T')[0];
+
+    // メニューと時間スロットをサーバーから取得
+    fetch('/api/options')
+      .then(r => r.json())
+      .then(({ menus, timeSlots }) => {
+        const menuSel = document.getElementById('menu');
+        menus.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m;
+          opt.textContent = m;
+          menuSel.appendChild(opt);
+        });
+
+        const timeSel = document.getElementById('time');
+        timeSlots.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t;
+          opt.textContent = t;
+          timeSel.appendChild(opt);
+        });
+      });
+
+    function showError(msg) {
+      const el = document.getElementById('error-msg');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    function hideError() {
+      document.getElementById('error-msg').classList.add('hidden');
+    }
+
+    function goConfirm() {
+      hideError();
+      const menu  = document.getElementById('menu').value;
+      const date  = document.getElementById('date').value;
+      const time  = document.getElementById('time').value;
+      const name  = document.getElementById('name').value.trim();
+      const phone = document.getElementById('phone').value.trim();
+
+      if (!menu || !date || !time || !name || !phone) {
+        showError('全ての項目を入力してください。');
+        return;
+      }
+
+      document.getElementById('c-menu').textContent  = menu;
+      document.getElementById('c-date').textContent  = date;
+      document.getElementById('c-time').textContent  = time;
+      document.getElementById('c-name').textContent  = name;
+      document.getElementById('c-phone').textContent = phone;
+
+      document.getElementById('step-form').classList.add('hidden');
+      document.getElementById('step-confirm').classList.remove('hidden');
+    }
+
+    function goBack() {
+      document.getElementById('step-confirm').classList.add('hidden');
+      document.getElementById('step-form').classList.remove('hidden');
+    }
+
+    async function submitReservation() {
+      document.getElementById('submit-btn').disabled = true;
+      document.getElementById('step-confirm').classList.add('hidden');
+      document.getElementById('step-loading').classList.remove('hidden');
+
+      const body = {
+        menu:       document.getElementById('c-menu').textContent,
+        date:       document.getElementById('c-date').textContent,
+        time:       document.getElementById('c-time').textContent,
+        name:       document.getElementById('c-name').textContent,
+        phone:      document.getElementById('c-phone').textContent,
+        lineUserId: lineUserId,  // LINEユーザーID（取得できた場合のみ）
+      };
+
+      try {
+        const res = await fetch('/api/reserve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          window.location.href = '/complete.html';
+        } else {
+          alert(data.message || '予約に失敗しました。');
+          document.getElementById('step-loading').classList.add('hidden');
+          document.getElementById('step-confirm').classList.remove('hidden');
+          document.getElementById('submit-btn').disabled = false;
+        }
+      } catch {
+        alert('通信エラーが発生しました。時間をおいて再度お試しください。');
+        document.getElementById('step-loading').classList.add('hidden');
+        document.getElementById('step-confirm').classList.remove('hidden');
+        document.getElementById('submit-btn').disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>

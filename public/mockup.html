@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>予約フォーム モックアップ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      background: #fdf6f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 32px 16px 64px;
+    }
+
+    .container {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.08);
+      padding: 36px 32px;
+      width: 100%;
+      max-width: 520px;
+    }
+
+    /* ヘッダー */
+    .header { text-align: center; margin-bottom: 32px; }
+    .header h1 { font-size: 1.5rem; color: #b5707c; font-weight: 700; margin-bottom: 6px; }
+    .header p { font-size: 0.82rem; color: #999; }
+
+    /* ステップインジケーター */
+    .steps {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      margin-bottom: 32px;
+    }
+    .step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .step-circle {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: #eee;
+      color: #aaa;
+      font-size: 0.75rem;
+      font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .step-circle.active { background: #b5707c; color: #fff; }
+    .step-circle.done { background: #e8a0aa; color: #fff; }
+    .step-label { font-size: 0.68rem; color: #aaa; }
+    .step-label.active { color: #b5707c; font-weight: 600; }
+    .step-line {
+      width: 48px; height: 2px;
+      background: #eee;
+      margin: 0 4px;
+      margin-bottom: 20px;
+    }
+    .step-line.done { background: #e8a0aa; }
+
+    /* セクション */
+    .section { margin-bottom: 28px; }
+    .section-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #888;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #f0e8e4;
+    }
+
+    /* メニューカード */
+    .menu-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .menu-card {
+      border: 2px solid #f0e4e7;
+      border-radius: 12px;
+      padding: 14px 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .menu-card:hover { border-color: #c4848f; background: #fdf0f2; }
+    .menu-card.selected { border-color: #b5707c; background: #fdf0f2; }
+    .menu-card .menu-name { font-size: 0.9rem; font-weight: 600; color: #444; }
+    .menu-card .menu-time { font-size: 0.75rem; color: #aaa; margin-top: 3px; }
+    .menu-card .menu-price { font-size: 0.78rem; color: #b5707c; margin-top: 4px; font-weight: 600; }
+
+    /* カレンダー */
+    .calendar { border: 1.5px solid #f0e4e7; border-radius: 14px; overflow: hidden; }
+    .cal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px;
+      background: #fdf6f0;
+      border-bottom: 1px solid #f0e4e7;
+    }
+    .cal-header span { font-size: 0.95rem; font-weight: 700; color: #555; }
+    .cal-nav {
+      background: none; border: none; cursor: pointer;
+      font-size: 1rem; color: #b5707c; padding: 4px 8px;
+    }
+    .cal-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr);
+      padding: 8px;
+      gap: 4px;
+    }
+    .cal-day-label {
+      text-align: center; font-size: 0.7rem; color: #bbb;
+      padding: 4px 0; font-weight: 600;
+    }
+    .cal-day-label.sun { color: #e8a0aa; }
+    .cal-day-label.sat { color: #a0b4e8; }
+    .cal-day {
+      aspect-ratio: 1;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.82rem; border-radius: 50%;
+      cursor: pointer; transition: all 0.15s;
+      position: relative;
+    }
+    .cal-day.empty { cursor: default; }
+    .cal-day.past { color: #ddd; cursor: default; }
+    .cal-day.available:hover { background: #fdf0f2; color: #b5707c; }
+    .cal-day.selected { background: #b5707c; color: #fff; font-weight: 700; }
+    .cal-day.booked { color: #ccc; cursor: not-allowed; }
+    .cal-day.booked::after {
+      content: '';
+      position: absolute;
+      bottom: 3px; left: 50%; transform: translateX(-50%);
+      width: 4px; height: 4px;
+      background: #e8a0aa; border-radius: 50%;
+    }
+    .cal-day.today { font-weight: 700; color: #b5707c; }
+
+    /* 凡例 */
+    .legend {
+      display: flex; gap: 16px; justify-content: flex-end;
+      padding: 8px 12px;
+      border-top: 1px solid #f0e4e7;
+      background: #fdf6f0;
+    }
+    .legend-item { display: flex; align-items: center; gap: 4px; font-size: 0.7rem; color: #aaa; }
+    .legend-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+    }
+    .legend-dot.available { background: #b5707c; }
+    .legend-dot.booked { background: #e8a0aa; }
+
+    /* 時間スロット */
+    .time-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .time-slot {
+      border: 1.5px solid #f0e4e7;
+      border-radius: 10px;
+      padding: 10px 6px;
+      text-align: center;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      color: #555;
+    }
+    .time-slot:hover { border-color: #c4848f; color: #b5707c; background: #fdf0f2; }
+    .time-slot.selected { border-color: #b5707c; background: #b5707c; color: #fff; font-weight: 700; }
+    .time-slot.booked {
+      background: #f8f8f8; color: #ccc;
+      cursor: not-allowed;
+      border-color: #eee;
+      text-decoration: line-through;
+    }
+    .time-slot .slot-status { font-size: 0.65rem; margin-top: 2px; }
+    .time-slot.booked .slot-status { color: #ddd; }
+    .time-slot.selected .slot-status { color: rgba(255,255,255,0.8); }
+    .time-slot .slot-status { color: #b5a0a4; }
+
+    /* 顧客情報 */
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block; font-size: 0.82rem; font-weight: 600;
+      color: #666; margin-bottom: 6px;
+    }
+    .required {
+      background: #e8727f; color: #fff;
+      font-size: 0.65rem; padding: 1px 5px;
+      border-radius: 4px; margin-left: 4px;
+    }
+    .form-group input {
+      width: 100%; padding: 12px 14px;
+      border: 1.5px solid #e8ddd8; border-radius: 10px;
+      font-size: 0.95rem; background: #fdfaf8; color: #333;
+    }
+    .form-group input:focus { outline: none; border-color: #c4848f; }
+
+    /* ボタン */
+    .btn {
+      display: block; width: 100%; padding: 15px;
+      background: #b5707c; color: #fff; border: none;
+      border-radius: 14px; font-size: 1rem; font-weight: 700;
+      cursor: pointer; margin-top: 24px;
+      box-shadow: 0 4px 12px rgba(181,112,124,0.3);
+    }
+
+    /* バッジ */
+    .badge {
+      display: inline-block;
+      background: #fdf0f2; color: #b5707c;
+      font-size: 0.72rem; font-weight: 600;
+      padding: 3px 8px; border-radius: 20px;
+      border: 1px solid #f0d4d8;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <h1>ご予約フォーム</h1>
+    <p>ご希望のメニューと日時をお選びください</p>
+  </div>
+
+  <!-- ステップ -->
+  <div class="steps">
+    <div class="step">
+      <div class="step-circle done">✓</div>
+      <div class="step-label">メニュー</div>
+    </div>
+    <div class="step-line done"></div>
+    <div class="step">
+      <div class="step-circle active">2</div>
+      <div class="step-label active">日時</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step">
+      <div class="step-circle">3</div>
+      <div class="step-label">お客様情報</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step">
+      <div class="step-circle">4</div>
+      <div class="step-label">確認</div>
+    </div>
+  </div>
+
+  <!-- メニュー選択（Step1 完了済みイメージ） -->
+  <div class="section">
+    <div class="section-title">メニュー <span class="badge">選択済み：カット</span></div>
+    <div class="menu-grid">
+      <div class="menu-card selected">
+        <div class="menu-name">カット</div>
+        <div class="menu-time">所要 60分</div>
+        <div class="menu-price">¥4,500〜</div>
+      </div>
+      <div class="menu-card">
+        <div class="menu-name">カラー</div>
+        <div class="menu-time">所要 90分</div>
+        <div class="menu-price">¥8,000〜</div>
+      </div>
+      <div class="menu-card">
+        <div class="menu-name">パーマ</div>
+        <div class="menu-time">所要 120分</div>
+        <div class="menu-price">¥12,000〜</div>
+      </div>
+      <div class="menu-card">
+        <div class="menu-name">カット＋カラー</div>
+        <div class="menu-time">所要 120分</div>
+        <div class="menu-price">¥11,000〜</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- カレンダー -->
+  <div class="section">
+    <div class="section-title">ご希望日 <span style="font-size:0.72rem;color:#b5a0a4;font-weight:400;">● サロンボードの空き状況をリアルタイム反映</span></div>
+    <div class="calendar">
+      <div class="cal-header">
+        <button class="cal-nav">‹</button>
+        <span>2026年4月</span>
+        <button class="cal-nav">›</button>
+      </div>
+      <div class="cal-grid">
+        <div class="cal-day-label sun">日</div>
+        <div class="cal-day-label">月</div>
+        <div class="cal-day-label">火</div>
+        <div class="cal-day-label">水</div>
+        <div class="cal-day-label">木</div>
+        <div class="cal-day-label">金</div>
+        <div class="cal-day-label sat">土</div>
+
+        <!-- 空白 -->
+        <div class="cal-day empty"></div>
+        <div class="cal-day empty"></div>
+        <div class="cal-day empty"></div>
+        <div class="cal-day past">1</div>
+        <div class="cal-day past">2</div>
+        <div class="cal-day past">3</div>
+        <div class="cal-day past">4</div>
+
+        <div class="cal-day past">5</div>
+        <div class="cal-day past">6</div>
+        <div class="cal-day past">7</div>
+        <div class="cal-day past">8</div>
+        <div class="cal-day past">9</div>
+        <div class="cal-day past">10</div>
+        <div class="cal-day past">11</div>
+
+        <div class="cal-day past">12</div>
+        <div class="cal-day past">13</div>
+        <div class="cal-day today available">14</div>
+        <div class="cal-day available">15</div>
+        <div class="cal-day booked">16</div>
+        <div class="cal-day available">17</div>
+        <div class="cal-day available selected">18</div>
+
+        <div class="cal-day booked">19</div>
+        <div class="cal-day available">20</div>
+        <div class="cal-day available">21</div>
+        <div class="cal-day available">22</div>
+        <div class="cal-day booked">23</div>
+        <div class="cal-day available">24</div>
+        <div class="cal-day available">25</div>
+
+        <div class="cal-day available">26</div>
+        <div class="cal-day available">27</div>
+        <div class="cal-day available">28</div>
+        <div class="cal-day available">29</div>
+        <div class="cal-day available">30</div>
+        <div class="cal-day empty"></div>
+        <div class="cal-day empty"></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot available"></div>予約可能</div>
+        <div class="legend-item"><div class="legend-dot booked"></div>満員</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 時間スロット -->
+  <div class="section">
+    <div class="section-title">ご希望時間 <span class="badge">4月18日(土)</span></div>
+    <div class="time-grid">
+      <div class="time-slot booked">10:00<div class="slot-status">×</div></div>
+      <div class="time-slot available">11:00<div class="slot-status">○</div></div>
+      <div class="time-slot selected">12:00<div class="slot-status">選択中</div></div>
+      <div class="time-slot booked">13:00<div class="slot-status">×</div></div>
+      <div class="time-slot available">14:00<div class="slot-status">○</div></div>
+      <div class="time-slot available">15:00<div class="slot-status">○</div></div>
+      <div class="time-slot booked">16:00<div class="slot-status">×</div></div>
+      <div class="time-slot available">17:00<div class="slot-status">○</div></div>
+    </div>
+  </div>
+
+  <!-- お客様情報 -->
+  <div class="section">
+    <div class="section-title">お客様情報</div>
+    <div class="form-group">
+      <label>お名前 <span class="required">必須</span></label>
+      <input type="text" placeholder="例：山田 花子" />
+    </div>
+    <div class="form-group">
+      <label>電話番号 <span class="required">必須</span></label>
+      <input type="tel" placeholder="例：090-1234-5678" />
+    </div>
+  </div>
+
+  <button class="btn">内容を確認する →</button>
+</div>
+</body>
+</html>
