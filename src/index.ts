@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import path from 'path';
-import { registerReservation } from './salonboard';
+import { registerReservation, getBookedSlots } from './salonboard';
 import { MENUS, MenuOption, TIME_SLOTS } from './types';
 
 const app = express();
@@ -24,6 +24,22 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // メニューと時間スロットをフロントエンドに提供
 app.get('/api/options', (_req: Request, res: Response) => {
   res.json({ menus: MENUS, timeSlots: Array.from(TIME_SLOTS) });
+});
+
+// 指定日の予約済み時間を返す（時間チップの非活性化に使用）
+app.get('/api/availability', async (req: Request, res: Response) => {
+  const date = req.query.date as string;
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    res.status(400).json({ bookedSlots: [] });
+    return;
+  }
+  try {
+    const bookedSlots = await getBookedSlots(date);
+    res.json({ bookedSlots });
+  } catch (err) {
+    console.error('[空き確認エラー]', err);
+    res.json({ bookedSlots: [] }); // エラー時は全スロット選択可能
+  }
 });
 
 // 予約フォーム送信

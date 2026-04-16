@@ -202,6 +202,14 @@ select:focus {
   font-weight: 700;
 }
 
+.time-chip.booked {
+  background: #f0f0f0;
+  color: #bbb;
+  border-color: #e0e0e0;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
 .time-selected-label {
   margin-top: 8px;
   font-size: 0.85rem;
