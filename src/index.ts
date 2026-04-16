@@ -41,7 +41,7 @@ app.post('/api/reserve', async (req: Request, res: Response) => {
 
     // LINE通知を送信（LINEユーザーIDがある場合のみ）
     if (lineUserId) {
-      sendLineNotification(lineUserId, { name, phone, menu, date, time }).catch((err) => {
+      sendLineNotification(lineUserId, { name, menu, date, time }).catch((err) => {
         console.error('[LINE通知] 送信エラー:', err);
       });
     }
