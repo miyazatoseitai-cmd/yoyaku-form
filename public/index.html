@@ -30,10 +30,10 @@
       </div>
 
       <div class="form-group">
-        <label for="time">ご希望時間 <span class="required">必須</span></label>
-        <select id="time">
-          <option value="">選択してください</option>
-        </select>
+        <label>ご希望時間 <span class="required">必須</span></label>
+        <input type="hidden" id="time" />
+        <div id="time-grid" class="time-grid"></div>
+        <p id="time-selected-label" class="time-selected-label hidden"></p>
       </div>
 
       <div class="form-group">
@@ -76,10 +76,7 @@
   </div>
 
   <script>
-    // LINEユーザーIDを保持する変数
     let lineUserId = null;
-
-    // LIFF初期化 → ユーザーIDを取得
     const LIFF_ID = '__LIFF_ID__';
 
     async function initLiff() {
@@ -89,16 +86,13 @@
           const profile = await liff.getProfile();
           lineUserId = profile.userId;
         } else {
-          // LINE外（PCブラウザなど）からのアクセス時はログインを促す
           liff.login();
         }
       } catch (e) {
-        // LIFF初期化失敗時はLINE通知なしで続行（通知なし予約として処理）
         console.warn('LIFF初期化エラー（LINE外からのアクセス）:', e);
       }
     }
 
-    // ページ読み込み時にLIFF初期化
     initLiff();
 
     // 日付の最小値を今日の翌日に設定
@@ -120,14 +114,26 @@
           menuSel.appendChild(opt);
         });
 
-        const timeSel = document.getElementById('time');
+        // 時間チップグリッドを生成
+        const grid = document.getElementById('time-grid');
         timeSlots.forEach(t => {
-          const opt = document.createElement('option');
-          opt.value = t;
-          opt.textContent = t;
-          timeSel.appendChild(opt);
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'time-chip';
+          btn.textContent = t;
+          btn.onclick = () => selectTime(t, btn);
+          grid.appendChild(btn);
         });
       });
+
+    function selectTime(t, btn) {
+      document.querySelectorAll('.time-chip').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      document.getElementById('time').value = t;
+      const label = document.getElementById('time-selected-label');
+      label.textContent = `選択中：${t}`;
+      label.classList.remove('hidden');
+    }
 
     function updatePriceLabel() {
       const sel = document.getElementById('menu');
@@ -165,8 +171,12 @@
         return;
       }
 
+      // 日付を見やすい形式に変換
+      const [y, mo, d] = date.split('-');
+      const dateLabel = `${parseInt(mo)}月${parseInt(d)}日`;
+
       document.getElementById('c-menu').textContent  = menu;
-      document.getElementById('c-date').textContent  = date;
+      document.getElementById('c-date').textContent  = dateLabel;
       document.getElementById('c-time').textContent  = time;
       document.getElementById('c-name').textContent  = name;
       document.getElementById('c-phone').textContent = phone;
@@ -185,13 +195,21 @@
       document.getElementById('step-confirm').classList.add('hidden');
       document.getElementById('step-loading').classList.remove('hidden');
 
+      // 確認画面の日付表示（例：4月17日）を YYYY-MM-DD に戻す
+      const dateLabel = document.getElementById('c-date').textContent; // 例: "4月17日"
+      const now = new Date();
+      const match = dateLabel.match(/(\d+)月(\d+)日/);
+      const isoDate = match
+        ? `${now.getFullYear()}-${match[1].padStart(2,'0')}-${match[2].padStart(2,'0')}`
+        : dateLabel;
+
       const body = {
         menu:       document.getElementById('c-menu').textContent,
-        date:       document.getElementById('c-date').textContent,
+        date:       isoDate,
         time:       document.getElementById('c-time').textContent,
         name:       document.getElementById('c-name').textContent,
         phone:      document.getElementById('c-phone').textContent,
-        lineUserId: lineUserId,  // LINEユーザーID（取得できた場合のみ）
+        lineUserId: lineUserId,
       };
 
       try {

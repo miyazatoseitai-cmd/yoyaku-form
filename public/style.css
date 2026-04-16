@@ -169,6 +169,46 @@ select:focus {
   font-weight: 600;
 }
 
+/* 時間チップグリッド */
+.time-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.time-chip {
+  padding: 8px 4px;
+  border: 1.5px solid #e0d4cc;
+  border-radius: 8px;
+  background: #fdfaf8;
+  color: #555;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.time-chip:hover {
+  border-color: #b5707c;
+  color: #b5707c;
+  background: #fdf0f2;
+}
+
+.time-chip.selected {
+  background: #b5707c;
+  color: #fff;
+  border-color: #b5707c;
+  font-weight: 700;
+}
+
+.time-selected-label {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #b5707c;
+  font-weight: 600;
+}
+
 /* ローディング */
 .loading-box {
   display: flex;

@@ -24,14 +24,17 @@ export const MENUS: MenuOption[] = [
   { salonboardName: '【ダイエット】ダイエットコース購入者用　0円', label: 'ダイエットコース（購入者用）',  price: 0    },
 ];
 
-export const TIME_SLOTS = [
-  '10:00',
-  '11:00',
-  '12:00',
-  '13:00',
-  '14:00',
-  '15:00',
-  '16:00',
-  '17:00',
-  '18:00',
-] as const;
+// 10:00〜19:30を15分刻みで生成
+function generateTimeSlots(): string[] {
+  const slots: string[] = [];
+  const start = 10 * 60;      // 10:00 in minutes
+  const end   = 19 * 60 + 30; // 19:30 in minutes
+  for (let m = start; m <= end; m += 15) {
+    const h = Math.floor(m / 60).toString().padStart(2, '0');
+    const min = (m % 60).toString().padStart(2, '0');
+    slots.push(`${h}:${min}`);
+  }
+  return slots;
+}
+
+export const TIME_SLOTS = generateTimeSlots();
