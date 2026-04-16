@@ -169,6 +169,26 @@ select:focus {
   font-weight: 600;
 }
 
+/* 時間ローディング */
+.time-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+  color: #888;
+  font-size: 0.85rem;
+}
+
+.spinner-small {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #f0e4e7;
+  border-top: 2px solid #b5707c;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
 /* 時間チップグリッド */
 .time-grid {
   display: grid;

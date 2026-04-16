@@ -32,6 +32,10 @@
       <div class="form-group">
         <label>ご希望時間 <span class="required">必須</span></label>
         <input type="hidden" id="time" />
+        <div id="time-loading" class="time-loading hidden">
+          <div class="spinner-small"></div>
+          <span>空き状況を確認中…</span>
+        </div>
         <div id="time-grid" class="time-grid"></div>
         <p id="time-selected-label" class="time-selected-label hidden"></p>
       </div>
@@ -140,13 +144,16 @@
       });
       hideError();
 
+      // ローディング表示
+      document.getElementById('time-loading').classList.remove('hidden');
+      document.getElementById('time-grid').classList.add('hidden');
+
       // 空き状況を取得
       try {
         const res = await fetch(`/api/availability?date=${date}`);
         const { isClosed, bookedSlots } = await res.json();
 
         if (isClosed) {
-          // 休業日: 日付をリセットしてエラー表示
           dateEl.value = '';
           showError('この日は休業日のため予約できません。別の日をお選びください。');
           return;
@@ -161,6 +168,9 @@
         });
       } catch {
         // 取得失敗時は全スロット選択可能のまま
+      } finally {
+        document.getElementById('time-loading').classList.add('hidden');
+        document.getElementById('time-grid').classList.remove('hidden');
       }
     }
 

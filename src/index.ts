@@ -26,15 +26,29 @@ app.get('/api/options', (_req: Request, res: Response) => {
   res.json({ menus: MENUS, timeSlots: Array.from(TIME_SLOTS) });
 });
 
+// 空き状況キャッシュ（5分間有効）
+const availabilityCache = new Map<string, { result: { isClosed: boolean; bookedSlots: string[] }; expiresAt: number }>();
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
 // 指定日の予約済み時間を返す（時間チップの非活性化に使用）
 app.get('/api/availability', async (req: Request, res: Response) => {
   const date = req.query.date as string;
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    res.status(400).json({ bookedSlots: [] });
+    res.status(400).json({ isClosed: false, bookedSlots: [] });
     return;
   }
+
+  // キャッシュヒット確認
+  const cached = availabilityCache.get(date);
+  if (cached && cached.expiresAt > Date.now()) {
+    console.log(`[空き確認] キャッシュヒット: ${date}`);
+    res.json(cached.result);
+    return;
+  }
+
   try {
     const result = await getAvailability(date);
+    availabilityCache.set(date, { result, expiresAt: Date.now() + CACHE_TTL_MS });
     res.json(result);
   } catch (err) {
     console.error('[空き確認エラー]', err);
