@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import path from 'path';
-import { registerReservation, getBookedSlots } from './salonboard';
+import { registerReservation, getAvailability } from './salonboard';
 import { MENUS, MenuOption, TIME_SLOTS } from './types';
 
 const app = express();
@@ -34,11 +34,11 @@ app.get('/api/availability', async (req: Request, res: Response) => {
     return;
   }
   try {
-    const bookedSlots = await getBookedSlots(date);
-    res.json({ bookedSlots });
+    const result = await getAvailability(date);
+    res.json(result);
   } catch (err) {
     console.error('[空き確認エラー]', err);
-    res.json({ bookedSlots: [] }); // エラー時は全スロット選択可能
+    res.json({ isClosed: false, bookedSlots: [] });
   }
 });
 

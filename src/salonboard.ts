@@ -28,11 +28,16 @@ async function loginAndGetPage() {
   return { browser, page };
 }
 
-/** 指定日の予約済み開始時間リストを取得する */
-export async function getBookedSlots(date: string): Promise<string[]> {
+export interface AvailabilityResult {
+  isClosed: boolean;
+  bookedSlots: string[];
+}
+
+/** 指定日の空き状況を取得する */
+export async function getAvailability(date: string): Promise<AvailabilityResult> {
   const email = process.env.SALONBOARD_EMAIL;
   const password = process.env.SALONBOARD_PASSWORD;
-  if (!email || !password) return [];
+  if (!email || !password) return { isClosed: false, bookedSlots: [] };
 
   const [year, month, day] = date.split('-');
   const dateParam = `${year}${month}${day}`;
@@ -49,32 +54,32 @@ export async function getBookedSlots(date: string): Promise<string[]> {
       { waitUntil: 'networkidle' }
     );
 
-    // 予約ブロックから開始時間を抽出
-    const bookedTimes = await page.evaluate(() => {
+    // ページ内容を解析
+    const { bookedTimes, isClosed } = await page.evaluate(() => {
       const times = new Set<string>();
 
-      // 方法1: 時刻テキストを含む予約ブロックを探す
-      // SalonBoardのスケジュール画面では予約ブロックの先頭に時刻が表示される
+      // 休業日の判定: "受付停止"・"休業"・"定休" などのテキストが含まれるか
+      const bodyText = document.body.innerText || '';
+      const closedKeywords = ['受付停止', '定休', '休業日', '臨時休業'];
+      const hasClosedText = closedKeywords.some(k => bodyText.includes(k));
+
+      // 予約ブロックから開始時間を抽出
       document.querySelectorAll('td, div, span').forEach(el => {
         const text = (el as HTMLElement).innerText?.trim() || '';
-        // "11:00" のような時刻で始まる予約ブロックを探す
         const match = text.match(/^(\d{1,2}:\d{2})/);
         if (match) {
           const parent = el.parentElement;
           const grandParent = parent?.parentElement;
-          // 背景色が設定されている（予約ブロックらしい）要素を探す
           const bg = (el as HTMLElement).style?.backgroundColor
             || (parent as HTMLElement)?.style?.backgroundColor
             || (grandParent as HTMLElement)?.style?.backgroundColor;
           if (bg && bg !== '' && bg !== 'transparent') {
-            // HH:MM 形式に正規化
             const [h, m] = match[1].split(':');
             times.add(`${h.padStart(2, '0')}:${m}`);
           }
         }
       });
 
-      // 方法2: data属性から時刻を取得
       document.querySelectorAll('[data-start], [data-time], [data-begin]').forEach(el => {
         const t = el.getAttribute('data-start')
           || el.getAttribute('data-time')
@@ -83,14 +88,20 @@ export async function getBookedSlots(date: string): Promise<string[]> {
         if (match) times.add(match[1]);
       });
 
-      return Array.from(times);
+      // スケジュール表の時間軸が存在するか（存在しない＝休業日の可能性）
+      const hasTimeAxis = bodyText.includes('10:00') || bodyText.includes('11:00');
+
+      return {
+        bookedTimes: Array.from(times),
+        isClosed: hasClosedText || !hasTimeAxis,
+      };
     });
 
-    console.log(`[SalonBoard] ${date} の予約済み時間:`, bookedTimes);
-    return bookedTimes;
+    console.log(`[SalonBoard] ${date} 休業日=${isClosed} 予約済み=`, bookedTimes);
+    return { isClosed, bookedSlots: bookedTimes };
   } catch (err) {
     console.error('[SalonBoard] 空き時間取得エラー:', err);
-    return []; // エラー時は全スロット選択可能（安全側に倒す）
+    return { isClosed: false, bookedSlots: [] };
   } finally {
     if (browser) await browser.close();
   }

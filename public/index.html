@@ -127,21 +127,32 @@
       });
 
     async function onDateChange() {
-      const date = document.getElementById('date').value;
+      const dateEl = document.getElementById('date');
+      const date = dateEl.value;
       if (!date) return;
 
-      // 選択中の時間をリセット
+      // 時間をリセット
       document.getElementById('time').value = '';
       document.getElementById('time-selected-label').classList.add('hidden');
       document.querySelectorAll('.time-chip').forEach(b => {
         b.classList.remove('selected', 'booked');
         b.disabled = false;
       });
+      hideError();
 
-      // 予約済みスロットを取得して非活性化
+      // 空き状況を取得
       try {
         const res = await fetch(`/api/availability?date=${date}`);
-        const { bookedSlots } = await res.json();
+        const { isClosed, bookedSlots } = await res.json();
+
+        if (isClosed) {
+          // 休業日: 日付をリセットしてエラー表示
+          dateEl.value = '';
+          showError('この日は休業日のため予約できません。別の日をお選びください。');
+          return;
+        }
+
+        // 予約済みスロットを非活性化
         document.querySelectorAll('.time-chip').forEach(btn => {
           if (bookedSlots.includes(btn.textContent)) {
             btn.classList.add('booked');
