@@ -262,6 +262,22 @@ select:focus {
   to { transform: rotate(360deg); }
 }
 
+/* 案内ボックス */
+.notice {
+  background: #fff8f0;
+  border: 1px solid #f0d8c0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-top: 20px;
+  font-size: 0.82rem;
+  color: #886644;
+  line-height: 1.7;
+}
+
+.notice p + p {
+  margin-top: 4px;
+}
+
 /* 完了ページ */
 .complete-box {
   text-align: center;
