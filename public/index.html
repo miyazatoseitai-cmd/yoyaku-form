@@ -18,9 +18,10 @@
 
       <div class="form-group">
         <label for="menu">メニュー <span class="required">必須</span></label>
-        <select id="menu">
+        <select id="menu" onchange="updatePriceLabel()">
           <option value="">選択してください</option>
         </select>
+        <p id="price-label" class="price-label hidden"></p>
       </div>
 
       <div class="form-group">
@@ -113,8 +114,9 @@
         const menuSel = document.getElementById('menu');
         menus.forEach(m => {
           const opt = document.createElement('option');
-          opt.value = m;
-          opt.textContent = m;
+          opt.value = m.label;
+          opt.textContent = m.label;
+          opt.dataset.price = m.price;
           menuSel.appendChild(opt);
         });
 
@@ -126,6 +128,19 @@
           timeSel.appendChild(opt);
         });
       });
+
+    function updatePriceLabel() {
+      const sel = document.getElementById('menu');
+      const opt = sel.options[sel.selectedIndex];
+      const priceEl = document.getElementById('price-label');
+      if (opt && opt.dataset.price !== undefined && sel.value !== '') {
+        const price = parseInt(opt.dataset.price);
+        priceEl.textContent = price === 0 ? '料金：無料' : `料金：${price.toLocaleString()}円`;
+        priceEl.classList.remove('hidden');
+      } else {
+        priceEl.classList.add('hidden');
+      }
+    }
 
     function showError(msg) {
       const el = document.getElementById('error-msg');

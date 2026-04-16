@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import path from 'path';
 import { registerReservation } from './salonboard';
-import { MENUS, TIME_SLOTS } from './types';
+import { MENUS, MenuOption, TIME_SLOTS } from './types';
 
 const app = express();
 
@@ -23,7 +23,7 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // メニューと時間スロットをフロントエンドに提供
 app.get('/api/options', (_req: Request, res: Response) => {
-  res.json({ menus: MENUS, timeSlots: TIME_SLOTS });
+  res.json({ menus: MENUS, timeSlots: Array.from(TIME_SLOTS) });
 });
 
 // 予約フォーム送信
@@ -36,8 +36,12 @@ app.post('/api/reserve', async (req: Request, res: Response) => {
   }
 
   try {
+    // フォームのラベル名からサロンボードの正式名称に変換
+    const menuOption = (MENUS as MenuOption[]).find((m) => m.label === menu);
+    const salonboardMenu = menuOption ? menuOption.salonboardName : menu;
+
     // サロンボードに予約登録
-    await registerReservation({ name, phone, menu, date, time });
+    await registerReservation({ name, phone, menu: salonboardMenu, date, time });
 
     // LINE通知を送信（LINEユーザーIDがある場合のみ）
     if (lineUserId) {

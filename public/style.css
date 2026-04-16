@@ -162,6 +162,13 @@ select:focus {
   display: none !important;
 }
 
+.price-label {
+  margin-top: 6px;
+  font-size: 0.9rem;
+  color: #b5707c;
+  font-weight: 600;
+}
+
 /* ローディング */
 .loading-box {
   display: flex;
