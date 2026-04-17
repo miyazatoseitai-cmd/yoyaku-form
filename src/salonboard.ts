@@ -1,37 +1,55 @@
-import { chromium } from 'playwright-core';
+import { chromium, Browser, Page } from 'playwright-core';
 import chromiumBin from '@sparticuz/chromium';
 import { ReservationData } from './types';
 
 const SALONBOARD_URL = 'https://salonboard.com/login/';
 
-async function loginAndGetPage() {
-  const email = process.env.SALONBOARD_EMAIL;
-  const password = process.env.SALONBOARD_PASSWORD;
+// ブラウザセッションを使い回す（ログインし直しを避ける）
+let _browser: Browser | null = null;
+let _page: Page | null = null;
 
-  if (!email || !password) {
-    throw new Error('SALONBOARD_EMAIL または SALONBOARD_PASSWORD が設定されていません');
+async function getSession(): Promise<Page> {
+  const email = process.env.SALONBOARD_EMAIL!;
+  const password = process.env.SALONBOARD_PASSWORD!;
+
+  // 既存セッションが生きているか確認
+  if (_browser && _page) {
+    try {
+      const url = _page.url();
+      if (!url.includes('/login/') && url.includes('salonboard.com')) {
+        return _page; // セッション有効
+      }
+    } catch {
+      // ページが壊れている場合は再作成
+    }
+  }
+
+  // ブラウザを起動（または再起動）
+  if (_browser) {
+    try { await _browser.close(); } catch {}
   }
 
   const executablePath = await chromiumBin.executablePath();
-  const browser = await chromium.launch({
+  _browser = await chromium.launch({
     args: chromiumBin.args,
     executablePath,
     headless: true,
   });
-  const page = await browser.newPage();
+  _page = await _browser.newPage();
 
-  await page.goto(SALONBOARD_URL, { waitUntil: 'networkidle' });
-  await page.fill('input[name="mailAddress"]', email);
-  await page.fill('input[name="password"]', password);
-  await page.click('button[type="submit"]');
-  await page.waitForNavigation({ waitUntil: 'networkidle' });
+  // ログイン
+  await _page.goto(SALONBOARD_URL, { waitUntil: 'domcontentloaded' });
+  await _page.fill('input[name="mailAddress"]', email);
+  await _page.fill('input[name="password"]', password);
+  await _page.click('button[type="submit"]');
+  await _page.waitForNavigation({ waitUntil: 'domcontentloaded' });
 
-  if (page.url().includes('/login/')) {
-    await browser.close();
+  if (_page.url().includes('/login/')) {
     throw new Error('サロンボードへのログインに失敗しました。');
   }
 
-  return { browser, page };
+  console.log('[SalonBoard] ログイン成功');
+  return _page;
 }
 
 export interface AvailabilityResult {
@@ -48,28 +66,21 @@ export async function getAvailability(date: string): Promise<AvailabilityResult>
   const [year, month, day] = date.split('-');
   const dateParam = `${year}${month}${day}`;
 
-  let browser;
   try {
-    const result = await loginAndGetPage();
-    browser = result.browser;
-    const page = result.page;
+    const page = await getSession();
 
-    // スケジュール画面に移動
     await page.goto(
       `https://salonboard.com/KLP/schedule/salonSchedule/?date=${dateParam}`,
-      { waitUntil: 'networkidle' }
+      { waitUntil: 'domcontentloaded' }
     );
 
-    // ページ内容を解析
     const { bookedTimes, isClosed } = await page.evaluate(() => {
       const times = new Set<string>();
-
-      // 休業日の判定: "受付停止"・"休業"・"定休" などのテキストが含まれるか
       const bodyText = document.body.innerText || '';
+
       const closedKeywords = ['受付停止', '定休', '休業日', '臨時休業'];
       const hasClosedText = closedKeywords.some(k => bodyText.includes(k));
 
-      // 予約ブロックから開始時間を抽出
       document.querySelectorAll('td, div, span').forEach(el => {
         const text = (el as HTMLElement).innerText?.trim() || '';
         const match = text.match(/^(\d{1,2}:\d{2})/);
@@ -94,7 +105,6 @@ export async function getAvailability(date: string): Promise<AvailabilityResult>
         if (match) times.add(match[1]);
       });
 
-      // スケジュール表の時間軸が存在するか（存在しない＝休業日の可能性）
       const hasTimeAxis = bodyText.includes('10:00') || bodyText.includes('11:00');
 
       return {
@@ -107,9 +117,9 @@ export async function getAvailability(date: string): Promise<AvailabilityResult>
     return { isClosed, bookedSlots: bookedTimes };
   } catch (err) {
     console.error('[SalonBoard] 空き時間取得エラー:', err);
+    // セッションをリセット（次回再ログイン）
+    _page = null;
     return { isClosed: false, bookedSlots: [] };
-  } finally {
-    if (browser) await browser.close();
   }
 }
 
@@ -118,53 +128,43 @@ export async function registerReservation(reservation: ReservationData): Promise
     throw new Error('予約データが不完全です');
   }
 
-  // テストモード: SALONBOARD_TEST=true の場合はサロンボードへの登録をスキップ
+  // テストモード
   if (process.env.SALONBOARD_TEST === 'true') {
     console.log('[SalonBoard] テストモード: 登録をスキップ', reservation);
     return;
   }
 
-  const { browser, page } = await loginAndGetPage();
+  const page = await getSession();
 
-  try {
-    // 予約登録ページへ移動
-    await page.goto('https://salonboard.com/CNT/draft/reservationAdd/', { waitUntil: 'networkidle' });
+  // 予約登録ページへ移動
+  await page.goto('https://salonboard.com/CNT/draft/reservationAdd/', { waitUntil: 'domcontentloaded' });
 
-    // 日付入力
-    const [year, month, day] = reservation.date.split('-');
-    const dateStr = `${year}/${month}/${day}`;
-    const dateInput = page.locator('input[name="visitDate"], input[id*="visitDate"], input[placeholder*="日付"]').first();
-    await dateInput.fill(dateStr);
+  const [year, month, day] = reservation.date.split('-');
+  const dateStr = `${year}/${month}/${day}`;
+  const dateInput = page.locator('input[name="visitDate"], input[id*="visitDate"], input[placeholder*="日付"]').first();
+  await dateInput.fill(dateStr);
 
-    // 時間入力
-    const timeInput = page.locator('select[name*="time"], input[name*="time"], select[id*="Time"]').first();
-    await timeInput.fill(reservation.time);
+  const timeInput = page.locator('select[name*="time"], input[name*="time"], select[id*="Time"]').first();
+  await timeInput.fill(reservation.time);
 
-    // メニュー選択
-    const menuSelect = page.locator('select[name*="menu"], select[id*="menu"]').first();
-    if (await menuSelect.isVisible()) {
-      await menuSelect.selectOption({ label: reservation.menu });
-    }
-
-    // 顧客名入力
-    const nameInput = page.locator('input[name*="name"], input[id*="name"], input[placeholder*="氏名"], input[placeholder*="お名前"]').first();
-    await nameInput.fill(reservation.name);
-
-    // 電話番号入力
-    if (reservation.phone) {
-      const phoneInput = page.locator('input[name*="tel"], input[name*="phone"], input[placeholder*="電話"]').first();
-      if (await phoneInput.isVisible()) {
-        await phoneInput.fill(reservation.phone);
-      }
-    }
-
-    // 保存
-    const saveButton = page.locator('button[type="submit"], input[type="submit"], button:has-text("登録"), button:has-text("保存")').first();
-    await saveButton.click();
-    await page.waitForNavigation({ waitUntil: 'networkidle' });
-
-    console.log(`[SalonBoard] 予約登録完了: ${reservation.name} 様 ${reservation.date} ${reservation.time}`);
-  } finally {
-    await browser.close();
+  const menuSelect = page.locator('select[name*="menu"], select[id*="menu"]').first();
+  if (await menuSelect.isVisible()) {
+    await menuSelect.selectOption({ label: reservation.menu });
   }
+
+  const nameInput = page.locator('input[name*="name"], input[id*="name"], input[placeholder*="氏名"], input[placeholder*="お名前"]').first();
+  await nameInput.fill(reservation.name);
+
+  if (reservation.phone) {
+    const phoneInput = page.locator('input[name*="tel"], input[name*="phone"], input[placeholder*="電話"]').first();
+    if (await phoneInput.isVisible()) {
+      await phoneInput.fill(reservation.phone);
+    }
+  }
+
+  const saveButton = page.locator('button[type="submit"], input[type="submit"], button:has-text("登録"), button:has-text("保存")').first();
+  await saveButton.click();
+  await page.waitForNavigation({ waitUntil: 'domcontentloaded' });
+
+  console.log(`[SalonBoard] 予約登録完了: ${reservation.name} 様 ${reservation.date} ${reservation.time}`);
 }
