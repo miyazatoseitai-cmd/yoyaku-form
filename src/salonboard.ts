@@ -1,4 +1,5 @@
-import { chromium } from 'playwright';
+import { chromium } from 'playwright-core';
+import chromiumBin from '@sparticuz/chromium';
 import { ReservationData } from './types';
 
 const SALONBOARD_URL = 'https://salonboard.com/login/';
@@ -11,7 +12,12 @@ async function loginAndGetPage() {
     throw new Error('SALONBOARD_EMAIL または SALONBOARD_PASSWORD が設定されていません');
   }
 
-  const browser = await chromium.launch({ headless: true });
+  const executablePath = await chromiumBin.executablePath();
+  const browser = await chromium.launch({
+    args: chromiumBin.args,
+    executablePath,
+    headless: true,
+  });
   const page = await browser.newPage();
 
   await page.goto(SALONBOARD_URL, { waitUntil: 'networkidle' });
