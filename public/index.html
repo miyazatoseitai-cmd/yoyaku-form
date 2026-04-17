@@ -36,6 +36,10 @@
           <div class="spinner-small"></div>
           <span>空き状況を確認中…</span>
         </div>
+        <div class="ampm-tabs">
+          <button type="button" class="ampm-tab active" onclick="switchAmPm('am', this)">午前</button>
+          <button type="button" class="ampm-tab" onclick="switchAmPm('pm', this)">午後</button>
+        </div>
         <div id="time-grid" class="time-grid"></div>
         <p id="time-selected-label" class="time-selected-label hidden"></p>
       </div>
@@ -131,6 +135,9 @@
           btn.className = 'time-chip';
           btn.textContent = t;
           btn.onclick = () => selectTime(t, btn);
+          // デフォルトは午前表示
+          const hour = parseInt(t.split(':')[0]);
+          if (hour >= 12) btn.style.display = 'none';
           grid.appendChild(btn);
         });
       });
@@ -143,9 +150,16 @@
       // 時間をリセット
       document.getElementById('time').value = '';
       document.getElementById('time-selected-label').classList.add('hidden');
-      document.querySelectorAll('.time-chip').forEach(b => {
-        b.classList.remove('selected', 'booked');
-        b.disabled = false;
+      // タブを午前にリセット
+      currentAmPm = 'am';
+      document.querySelectorAll('.ampm-tab').forEach((b, i) => {
+        b.classList.toggle('active', i === 0);
+      });
+      document.querySelectorAll('.time-chip').forEach(btn => {
+        btn.classList.remove('selected', 'booked');
+        btn.disabled = false;
+        const hour = parseInt(btn.textContent.split(':')[0]);
+        btn.style.display = hour < 12 ? '' : 'none';
       });
       hideError();
 
@@ -177,6 +191,19 @@
         document.getElementById('time-loading').classList.add('hidden');
         document.getElementById('time-grid').classList.remove('hidden');
       }
+    }
+
+    let currentAmPm = 'am';
+
+    function switchAmPm(ampm, tabBtn) {
+      currentAmPm = ampm;
+      document.querySelectorAll('.ampm-tab').forEach(b => b.classList.remove('active'));
+      tabBtn.classList.add('active');
+      document.querySelectorAll('.time-chip').forEach(btn => {
+        const hour = parseInt(btn.textContent.split(':')[0]);
+        const isAm = hour < 12;
+        btn.style.display = (ampm === 'am' ? isAm : !isAm) ? '' : 'none';
+      });
     }
 
     function selectTime(t, btn) {

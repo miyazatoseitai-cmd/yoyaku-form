@@ -189,6 +189,32 @@ select:focus {
   flex-shrink: 0;
 }
 
+/* 午前/午後タブ */
+.ampm-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.ampm-tab {
+  flex: 1;
+  padding: 8px;
+  border: 1.5px solid #e0d4cc;
+  border-radius: 8px;
+  background: #fdfaf8;
+  color: #888;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ampm-tab.active {
+  background: #b5707c;
+  color: #fff;
+  border-color: #b5707c;
+}
+
 /* 時間チップグリッド */
 .time-grid {
   display: grid;
