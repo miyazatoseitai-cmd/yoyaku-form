@@ -26,9 +26,31 @@ app.get('/api/options', (_req: Request, res: Response) => {
   res.json({ menus: MENUS, timeSlots: Array.from(TIME_SLOTS) });
 });
 
-// 空き状況キャッシュ（5分間有効）
+// 空き状況キャッシュ（10分間有効）
 const availabilityCache = new Map<string, { result: { isClosed: boolean; bookedSlots: string[] }; expiresAt: number }>();
-const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_TTL_MS = 10 * 60 * 1000;
+
+// 今後N日分を事前取得してキャッシュ（バックグラウンド）
+async function prefetchAvailability(days = 30) {
+  console.log(`[事前取得] 今後${days}日分の空き状況を取得開始`);
+  const today = new Date();
+  for (let i = 1; i <= days; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    const date = d.toISOString().split('T')[0];
+    // まだキャッシュにない日付だけ取得
+    if (!availabilityCache.has(date) || availabilityCache.get(date)!.expiresAt < Date.now()) {
+      try {
+        const result = await getAvailability(date);
+        availabilityCache.set(date, { result, expiresAt: Date.now() + CACHE_TTL_MS });
+        console.log(`[事前取得] ${date} 完了`);
+      } catch {
+        // 個別の失敗は無視して続行
+      }
+    }
+  }
+  console.log('[事前取得] 完了');
+}
 
 // 指定日の予約済み時間を返す（時間チップの非活性化に使用）
 app.get('/api/availability', async (req: Request, res: Response) => {
@@ -46,6 +68,7 @@ app.get('/api/availability', async (req: Request, res: Response) => {
     return;
   }
 
+  // キャッシュミス時はリアルタイム取得
   try {
     const result = await getAvailability(date);
     availabilityCache.set(date, { result, expiresAt: Date.now() + CACHE_TTL_MS });
@@ -176,4 +199,8 @@ async function sendLineNotification(
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`予約フォーム起動中: http://localhost:${PORT}`);
+  // サーバー起動後に事前取得を開始（バックグラウンド）
+  setTimeout(() => {
+    prefetchAvailability(30).catch(err => console.error('[事前取得エラー]', err));
+  }, 3000); // 起動から3秒後に開始
 });
