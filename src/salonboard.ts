@@ -112,6 +112,12 @@ export async function registerReservation(reservation: ReservationData): Promise
     throw new Error('予約データが不完全です');
   }
 
+  // テストモード: SALONBOARD_TEST=true の場合はサロンボードへの登録をスキップ
+  if (process.env.SALONBOARD_TEST === 'true') {
+    console.log('[SalonBoard] テストモード: 登録をスキップ', reservation);
+    return;
+  }
+
   const { browser, page } = await loginAndGetPage();
 
   try {
