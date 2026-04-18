@@ -93,42 +93,36 @@ app.post('/api/reserve', async (req: Request, res: Response) => {
     console.log(`[LINE UserID] ${lineUserId}`);
   }
 
-  try {
-    // フォームのラベル名からサロンボードの正式名称に変換
-    const menuOption = (MENUS as MenuOption[]).find((m) => m.label === menu);
-    const salonboardMenu = menuOption ? menuOption.salonboardName : menu;
+  // フォームのラベル名からサロンボードの正式名称に変換
+  const menuOption = (MENUS as MenuOption[]).find((m) => m.label === menu);
+  const salonboardMenu = menuOption ? menuOption.salonboardName : menu;
 
-    // サロンボードに予約登録
-    await registerReservation({ name, phone, menu: salonboardMenu, date, time });
+  // キャッシュから空き状況を確認（即時・追加遅延なし）
+  const cached = availabilityCache.get(date);
+  const bookedSlots = cached ? cached.result.bookedSlots : [];
+  const isConflict = bookedSlots.includes(time);
 
-    // キャッシュから空き状況を確認（即時・追加遅延なし）
-    const cached = availabilityCache.get(date);
-    const bookedSlots = cached ? cached.result.bookedSlots : [];
-    const isConflict = bookedSlots.includes(time);
-
-    // お客様へのLINE通知
-    if (lineUserId) {
-      sendLineNotification(lineUserId, { name, menu, date, time }).catch((err) => {
-        console.error('[LINE通知・お客様] 送信エラー:', err);
-      });
-    }
-
-    // オーナーへの通知（競合情報付き）
-    const ownerLineUserId = process.env.OWNER_LINE_USER_ID;
-    if (ownerLineUserId) {
-      sendOwnerNotification(ownerLineUserId, { name, phone, menu, date, time, isConflict }).catch((err) => {
-        console.error('[LINE通知・オーナー] 送信エラー:', err);
-      });
-    }
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error('[予約エラー]', err);
-    res.status(500).json({
-      success: false,
-      message: 'サロンボードへの登録に失敗しました。お手数ですが店舗にお電話ください。',
+  // お客様へのLINE通知（先に送信）
+  if (lineUserId) {
+    sendLineNotification(lineUserId, { name, menu, date, time }).catch((err) => {
+      console.error('[LINE通知・お客様] 送信エラー:', err);
     });
   }
+
+  // オーナーへの通知（競合情報付き）
+  const ownerLineUserId = process.env.OWNER_LINE_USER_ID;
+  if (ownerLineUserId) {
+    sendOwnerNotification(ownerLineUserId, { name, phone, menu, date, time, isConflict }).catch((err) => {
+      console.error('[LINE通知・オーナー] 送信エラー:', err);
+    });
+  }
+
+  // サロンボードへの登録はバックグラウンドで試みる（失敗してもお客様には影響しない）
+  registerReservation({ name, phone, menu: salonboardMenu, date, time }).catch((err) => {
+    console.error('[サロンボード登録エラー]', err);
+  });
+
+  res.json({ success: true });
 });
 
 // オーナーへのLINE通知（競合確認付き）
