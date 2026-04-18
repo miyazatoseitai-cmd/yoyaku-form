@@ -88,6 +88,11 @@ app.post('/api/reserve', async (req: Request, res: Response) => {
     return;
   }
 
+  // LINEユーザーIDをログに出力（オーナーID確認用）
+  if (lineUserId) {
+    console.log(`[LINE UserID] ${lineUserId}`);
+  }
+
   try {
     // フォームのラベル名からサロンボードの正式名称に変換
     const menuOption = (MENUS as MenuOption[]).find((m) => m.label === menu);
