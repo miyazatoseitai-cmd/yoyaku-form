@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>予約確定通知を送る</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1 style="font-size:1.2rem;">確定通知を送る</h1>
+    <p class="subtitle">__NAME__ 様への確定通知を編集して送信してください。</p>
+
+    <div class="form-group">
+      <label for="message">通知メッセージ</label>
+      <textarea id="message" rows="12" style="width:100%;padding:12px 14px;border:1.5px solid #e0d4cc;border-radius:10px;font-size:0.95rem;background:#fdfaf8;color:#333;line-height:1.7;resize:vertical;">__TEMPLATE__</textarea>
+    </div>
+
+    <p id="error-msg" class="error hidden"></p>
+    <p id="success-msg" class="hidden" style="color:#27ae60;font-size:0.9rem;text-align:center;margin-bottom:10px;">送信しました！</p>
+
+    <button class="btn" onclick="sendConfirm()">予約確定通知を送信する</button>
+  </div>
+
+  <script>
+    const reservationId = '__RESERVATION_ID__';
+
+    async function sendConfirm() {
+      const message = document.getElementById('message').value.trim();
+      if (!message) {
+        document.getElementById('error-msg').textContent = 'メッセージを入力してください。';
+        document.getElementById('error-msg').classList.remove('hidden');
+        return;
+      }
+
+      document.querySelector('.btn').disabled = true;
+      document.getElementById('error-msg').classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reservationId, message }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          document.getElementById('success-msg').classList.remove('hidden');
+          document.querySelector('.btn').textContent = '送信済み';
+        } else {
+          document.getElementById('error-msg').textContent = data.message || '送信に失敗しました。';
+          document.getElementById('error-msg').classList.remove('hidden');
+          document.querySelector('.btn').disabled = false;
+        }
+      } catch {
+        document.getElementById('error-msg').textContent = '通信エラーが発生しました。';
+        document.getElementById('error-msg').classList.remove('hidden');
+        document.querySelector('.btn').disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
