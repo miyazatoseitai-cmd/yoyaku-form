@@ -101,10 +101,23 @@ app.post('/api/reserve', async (req: Request, res: Response) => {
     // サロンボードに予約登録
     await registerReservation({ name, phone, menu: salonboardMenu, date, time });
 
-    // LINE通知を送信（LINEユーザーIDがある場合のみ）
+    // キャッシュから空き状況を確認（即時・追加遅延なし）
+    const cached = availabilityCache.get(date);
+    const bookedSlots = cached ? cached.result.bookedSlots : [];
+    const isConflict = bookedSlots.includes(time);
+
+    // お客様へのLINE通知
     if (lineUserId) {
       sendLineNotification(lineUserId, { name, menu, date, time }).catch((err) => {
-        console.error('[LINE通知] 送信エラー:', err);
+        console.error('[LINE通知・お客様] 送信エラー:', err);
+      });
+    }
+
+    // オーナーへの通知（競合情報付き）
+    const ownerLineUserId = process.env.OWNER_LINE_USER_ID;
+    if (ownerLineUserId) {
+      sendOwnerNotification(ownerLineUserId, { name, phone, menu, date, time, isConflict }).catch((err) => {
+        console.error('[LINE通知・オーナー] 送信エラー:', err);
       });
     }
 
@@ -117,6 +130,91 @@ app.post('/api/reserve', async (req: Request, res: Response) => {
     });
   }
 });
+
+// オーナーへのLINE通知（競合確認付き）
+async function sendOwnerNotification(
+  userId: string,
+  reservation: { name: string; phone: string; menu: string; date: string; time: string; isConflict: boolean }
+): Promise<void> {
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  if (!token) throw new Error('LINE_CHANNEL_ACCESS_TOKEN が設定されていません');
+
+  const [, month, day] = reservation.date.split('-');
+  const dateLabel = `${parseInt(month)}月${parseInt(day)}日`;
+
+  const conflictText = reservation.isConflict
+    ? '⚠️ この時間はすでに予約が入っています！確認してください。'
+    : '✅ この時間は空きがあります。';
+
+  const message = {
+    type: 'flex',
+    altText: `【新規予約】${reservation.name} 様 ${dateLabel} ${reservation.time}`,
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: reservation.isConflict ? '#c0392b' : '#27ae60',
+        contents: [
+          {
+            type: 'text',
+            text: reservation.isConflict ? '⚠️ 新規予約（競合あり）' : '✅ 新規予約',
+            color: '#ffffff',
+            weight: 'bold',
+            size: 'md',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          { type: 'box', layout: 'horizontal', contents: [
+            { type: 'text', text: 'お名前', color: '#aaaaaa', size: 'sm', flex: 2 },
+            { type: 'text', text: `${reservation.name} 様`, size: 'sm', flex: 3, weight: 'bold' },
+          ]},
+          { type: 'box', layout: 'horizontal', contents: [
+            { type: 'text', text: '電話番号', color: '#aaaaaa', size: 'sm', flex: 2 },
+            { type: 'text', text: reservation.phone, size: 'sm', flex: 3, weight: 'bold' },
+          ]},
+          { type: 'box', layout: 'horizontal', contents: [
+            { type: 'text', text: 'メニュー', color: '#aaaaaa', size: 'sm', flex: 2 },
+            { type: 'text', text: reservation.menu, size: 'sm', flex: 3, weight: 'bold' },
+          ]},
+          { type: 'box', layout: 'horizontal', contents: [
+            { type: 'text', text: '日時', color: '#aaaaaa', size: 'sm', flex: 2 },
+            { type: 'text', text: `${dateLabel} ${reservation.time}`, size: 'sm', flex: 3, weight: 'bold' },
+          ]},
+          { type: 'separator', margin: 'md' },
+          {
+            type: 'text',
+            text: conflictText,
+            size: 'sm',
+            color: reservation.isConflict ? '#c0392b' : '#27ae60',
+            wrap: true,
+            margin: 'md',
+            weight: 'bold',
+          },
+        ],
+      },
+    },
+  };
+
+  const response = await fetch('https://api.line.me/v2/bot/message/push', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ to: userId, messages: [message] }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`LINE API エラー: ${response.status} ${text}`);
+  }
+}
 
 // LINE プッシュ通知送信
 async function sendLineNotification(
