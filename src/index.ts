@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import path from 'path';
-import { registerReservation, getAvailability } from './salonboard';
-import { MENUS, MenuOption, TIME_SLOTS } from './types';
+import { getAvailability } from './salonboard';
+import { MENUS, TIME_SLOTS } from './types';
 
 const app = express();
 
@@ -93,10 +93,6 @@ app.post('/api/reserve', async (req: Request, res: Response) => {
     console.log(`[LINE UserID] ${lineUserId}`);
   }
 
-  // フォームのラベル名からサロンボードの正式名称に変換
-  const menuOption = (MENUS as MenuOption[]).find((m) => m.label === menu);
-  const salonboardMenu = menuOption ? menuOption.salonboardName : menu;
-
   // キャッシュから空き状況を確認（即時・追加遅延なし）
   const cached = availabilityCache.get(date);
   const bookedSlots = cached ? cached.result.bookedSlots : [];
@@ -116,11 +112,6 @@ app.post('/api/reserve', async (req: Request, res: Response) => {
       console.error('[LINE通知・オーナー] 送信エラー:', err);
     });
   }
-
-  // サロンボードへの登録はバックグラウンドで試みる（失敗してもお客様には影響しない）
-  registerReservation({ name, phone, menu: salonboardMenu, date, time }).catch((err) => {
-    console.error('[サロンボード登録エラー]', err);
-  });
 
   res.json({ success: true });
 });
